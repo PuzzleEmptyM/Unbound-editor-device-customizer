@@ -1,0 +1,73 @@
+{
+  "obs": {
+    "host": "localhost",
+    "port": 4455,
+    "password": "obsCONNECT"
+  },
+  "layers": {
+    "default": {
+      "name": "Default",
+      "buttons": {
+        "IN": {
+          "action": "none"
+        },
+        "CAM1": {
+          "action": "obs_scene",
+          "scene": "Scene"
+        },
+        "CAM2": {
+          "action": "obs_scene",
+          "scene": "just desktop"
+        },
+        "CAM3": {
+          "action": "obs_scene",
+          "scene": "wide angle camera"
+        },
+        "SMART_INSRT": {
+          "action": "layer_push",
+          "layer": "c177ad81"
+        }
+      }
+    },
+    "c177ad81": {
+      "name": "Resolve Editing",
+      "buttons": {
+        "IN": {
+          "action": "hotkey",
+          "keys": "`"
+        },
+        "OUT": {
+          "action": "hotkey",
+          "keys": "shift+`"
+        },
+        "SLIP_SRC": {
+          "action": "hotkey",
+          "keys": "a"
+        },
+        "SLIP_DEST": {
+          "action": "hotkey",
+          "keys": "s"
+        },
+        "TRANS_DUR": {
+          "action": "hotkey",
+          "keys": "d"
+        },
+        "TRIM_OUT": {
+          "action": "hotkey",
+          "keys": "w"
+        },
+        "TRIM_IN": {
+          "action": "hotkey",
+          "keys": "q"
+        },
+        "ROLL": {
+          "action": "hotkey",
+          "keys": "e"
+        },
+        "SMART_INSRT": {
+          "action": "layer_pop"
+        }
+      }
+    }
+  }
+}
