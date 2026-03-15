@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QDialog, QListWidget, QListWidgetItem, QDialogButtonBox,
 )
 
+import platform_layer
 import config as cfg
 from actions import obs as obs_action
 from actions import hotkey as hotkey_action
@@ -55,23 +56,8 @@ _FLAT_TO_CAT = {
 
 
 # ---------------------------------------------------------------------------
-# App picker dialog — searchable Start Menu shortcut browser
+# App picker dialog — searchable installed app browser
 # ---------------------------------------------------------------------------
-
-def _collect_start_menu_apps() -> list[tuple[str, str]]:
-    """Return [(display_name, lnk_path), ...] from user + system Start Menu."""
-    import os, glob as _glob
-    folders = [
-        os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs"),
-        os.path.expandvars(r"%PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs"),
-    ]
-    apps = {}
-    for folder in folders:
-        for lnk in _glob.glob(os.path.join(folder, "**", "*.lnk"), recursive=True):
-            name = os.path.splitext(os.path.basename(lnk))[0]
-            if name not in apps:          # user folder wins over system folder
-                apps[name] = lnk
-    return sorted(apps.items(), key=lambda x: x[0].lower())
 
 
 class AppPickerDialog(QDialog):
@@ -97,7 +83,7 @@ class AppPickerDialog(QDialog):
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
-        self._apps = _collect_start_menu_apps()
+        self._apps = platform_layer.collect_installable_apps()
         self._populate(self._apps)
 
     def _populate(self, items):
@@ -1085,11 +1071,10 @@ def dispatch(button_name: str, config: dict, layer_id: str = cfg.DEFAULT_LAYER_I
             obs_action.client.toggle_mute_mic()
 
     elif atype == cfg.ACTION_APP_LAUNCH:
-        import os
         path = action.get("path", "")
         if path:
             try:
-                os.startfile(path)
+                platform_layer.launch_app(path)
             except Exception as e:
                 print(f'[launch] {e}')
 

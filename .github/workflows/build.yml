@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # allow manual trigger from GitHub Actions tab
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Windows — produces SpeedEditorCustomizer-Windows.zip
+  # ---------------------------------------------------------------------------
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install PyQt6 hid pynput pywin32 obsws-python pycaw screen-brightness-control pyinstaller pyinstaller-hooks-contrib
+
+      - name: Build
+        run: python -m PyInstaller build.spec --clean
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeedEditorCustomizer-Windows
+          path: dist/SpeedEditorCustomizer/
+
+  # ---------------------------------------------------------------------------
+  # macOS — produces SpeedEditorCustomizer-macOS.zip
+  # ---------------------------------------------------------------------------
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system dependencies
+        run: brew install hidapi
+
+      - name: Install dependencies
+        run: |
+          pip install PyQt6 hid pynput obsws-python screen-brightness-control pyinstaller pyinstaller-hooks-contrib
+
+      - name: Build
+        run: python -m PyInstaller build.spec --clean
+
+      - name: Zip .app bundle
+        run: cd dist && zip -r SpeedEditorCustomizer-macOS.zip SpeedEditorCustomizer.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeedEditorCustomizer-macOS
+          path: dist/SpeedEditorCustomizer-macOS.zip
