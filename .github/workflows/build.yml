@@ -40,7 +40,7 @@ jobs:
   # macOS — produces SpeedEditorCustomizer-macOS.zip
   # ---------------------------------------------------------------------------
   build-macos:
-    runs-on: macos-13   # Intel x86_64 — runs on both Intel and Apple Silicon (via Rosetta 2)
+    runs-on: macos-latest   # arm64 (Apple Silicon) — Intel Macs must run from source
     steps:
       - uses: actions/checkout@v4
 
