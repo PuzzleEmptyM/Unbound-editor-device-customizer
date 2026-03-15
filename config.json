@@ -69,7 +69,7 @@
           "action": "layer_pop"
         },
         "SMTH_CUT": {
-          "action": "toggle_hold",
+          "action": "hold_key",
           "keys": "alt"
         },
         "CAM1": {

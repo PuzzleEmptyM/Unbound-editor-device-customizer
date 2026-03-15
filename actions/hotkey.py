@@ -41,7 +41,7 @@ SPECIAL_KEYS = {
 # apps (like Resolve) see the key as held when reading mouse scroll events.
 # ---------------------------------------------------------------------------
 VK_CODES = {
-    "ctrl":       0x11,  "shift":     0x10,  "alt":       0x12,
+    "ctrl":       0x11,  "shift":     0x10,  "alt":       0xA4,  # VK_LMENU
     "win":        0x5B,  "enter":     0x0D,  "esc":       0x1B,
     "space":      0x20,  "tab":       0x09,  "backspace": 0x08,
     "delete":     0x2E,  "home":      0x24,  "end":       0x23,
