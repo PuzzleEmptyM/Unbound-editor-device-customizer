@@ -28,21 +28,23 @@ If the device is not available at startup (e.g. Resolve is using it), the app re
 ## Requirements
 
 - Windows 10 or 11
-- Python 3.12 (managed via `uv`)
+- Python 3.12
 - Blackmagic Design Speed Editor connected over Bluetooth
 - OBS Studio with WebSocket server enabled (optional, for OBS actions)
 
 ## Setup
 
+Create a virtual environment and install dependencies:
+
 ```
-uv venv
-uv pip install PyQt6 hid pynput pywin32 obsws-python
+python -m venv .venv
+.venv\Scripts\pip install PyQt6 hid pynput pywin32 obsws-python
 ```
 
 Then run:
 
 ```
-uv run main.py
+.venv\Scripts\python main.py
 ```
 
 ## Usage with DaVinci Resolve
