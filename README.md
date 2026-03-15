@@ -2,6 +2,17 @@
 
 A desktop app for remapping the buttons on a Blackmagic Design Speed Editor to anything you want, without needing DaVinci Resolve open.
 
+## Download
+
+**[Download the latest build](https://github.com/PuzzleEmptyM/blackmagic-speed-editor-customizer/releases/tag/latest)**
+
+| Platform | File |
+|----------|------|
+| Windows | `SpeedEditorCustomizer-Windows.zip` — extract and run `SpeedEditorCustomizer.exe` |
+| macOS | `SpeedEditorCustomizer-macOS.zip` — extract and open `SpeedEditorCustomizer.app` |
+
+> Builds are updated automatically whenever the main branch changes.
+
 ---
 
 ## Quick Feature Update: March 15, 2025

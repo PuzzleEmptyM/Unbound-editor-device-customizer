@@ -26,11 +26,15 @@ jobs:
       - name: Build
         run: python -m PyInstaller build.spec --clean
 
+      - name: Zip build
+        run: cd dist && Compress-Archive -Path SpeedEditorCustomizer -DestinationPath SpeedEditorCustomizer-Windows.zip
+        shell: pwsh
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: SpeedEditorCustomizer-Windows
-          path: dist/SpeedEditorCustomizer/
+          path: dist/SpeedEditorCustomizer-Windows.zip
 
   # ---------------------------------------------------------------------------
   # macOS — produces SpeedEditorCustomizer-macOS.zip
@@ -62,3 +66,36 @@ jobs:
         with:
           name: SpeedEditorCustomizer-macOS
           path: dist/SpeedEditorCustomizer-macOS.zip
+
+  # ---------------------------------------------------------------------------
+  # Release — runs after both builds succeed, publishes to "Latest" release
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: SpeedEditorCustomizer-Windows
+          path: artifacts/
+
+      - name: Download macOS build
+        uses: actions/download-artifact@v4
+        with:
+          name: SpeedEditorCustomizer-macOS
+          path: artifacts/
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          body: Automatically built from the latest commit on main.
+          prerelease: false
+          make_latest: true
+          files: |
+            artifacts/SpeedEditorCustomizer-Windows.zip
+            artifacts/SpeedEditorCustomizer-macOS.zip
