@@ -9,9 +9,11 @@ A desktop app for remapping the buttons on a Blackmagic Design Speed Editor to a
 | Platform | File |
 |----------|------|
 | Windows | `SpeedEditorCustomizer-Windows.zip` — extract and run `SpeedEditorCustomizer.exe` |
-| macOS | `SpeedEditorCustomizer-macOS.zip` — extract and open `SpeedEditorCustomizer.app` |
+| macOS (Apple Silicon only) | `SpeedEditorCustomizer-macOS.zip` — extract and open `SpeedEditorCustomizer.app` |
 
 > Builds are updated automatically whenever the main branch changes.
+>
+> **Intel Mac users:** the pre-built download will not run on Intel Macs. Free CI runners no longer support Intel Mac builds. See the [Running from source](#running-from-source-mac) section below.
 
 ---
 
@@ -65,7 +67,7 @@ If the device is not available at startup (e.g. Resolve is using it), the app re
 - Python 3.12
 - Blackmagic Design Speed Editor connected over Bluetooth or USB
 
-## Setup
+## Setup (Windows)
 
 Create a virtual environment and install dependencies:
 
@@ -79,6 +81,26 @@ Then run:
 ```
 .venv\Scripts\python main.py
 ```
+
+## Running from source (Mac)
+
+<a name="running-from-source-mac"></a>
+
+Requires Python 3.12 and [Homebrew](https://brew.sh).
+
+```
+brew install python@3.12
+python3.12 -m venv .venv
+.venv/bin/pip install PyQt6 hidapi pynput obsws-python screen-brightness-control
+```
+
+Then run:
+
+```
+.venv/bin/python main.py
+```
+
+> Screen brightness control on macOS may require granting Accessibility permissions in System Settings → Privacy & Security.
 
 ## Usage with DaVinci Resolve
 
