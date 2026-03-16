@@ -142,3 +142,4 @@ The Speed Editor requires a challenge-response handshake before it sends input e
 ## Credits
 
 HID authentication algorithm by [Sylvain Munaut](https://github.com/smunaut) (Apache 2.0).
+Claude Code used for styling, debugging, and documentation.
