@@ -9,8 +9,8 @@ A desktop app for remapping the buttons on a Blackmagic Design Speed Editor to a
 | Platform | File |
 |----------|------|
 | Windows | `SpeedEditorCustomizer-Windows.zip` — extract and run `SpeedEditorCustomizer.exe` |
-| macOS — Apple Silicon (M1/M2/M3) | `SpeedEditorCustomizer-macOS-AppleSilicon.zip` — extract and open `SpeedEditorCustomizer.app` |
-| macOS — Intel | `SpeedEditorCustomizer-macOS-Intel.zip` — extract and open `SpeedEditorCustomizer.app` |
+| macOS — Apple Silicon | `SpeedEditorCustomizer-macOS-AppleSilicon.zip` — extract and open `SpeedEditorCustomizer.app` |
+| macOS — Intel (macOS 13+) | `SpeedEditorCustomizer-macOS-Intel.zip` — extract and open `SpeedEditorCustomizer.app` |
 
 > Builds are updated automatically whenever the main branch changes.
 
@@ -63,6 +63,7 @@ If the device is not available at startup (e.g. Resolve is using it), the app re
 ## Requirements
 
 - Windows 10 or 11
+- macOS 13 or higher
 - Python 3.12
 - Blackmagic Design Speed Editor connected over Bluetooth or USB
 
