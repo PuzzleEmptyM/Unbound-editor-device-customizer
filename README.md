@@ -1,4 +1,4 @@
-# Blackmagic Speed Editor Customizer
+# Unbound-editor-device-customizer
 
 A desktop app for remapping the buttons on a Blackmagic Design Speed Editor to anything you want, without needing DaVinci Resolve open.
 
