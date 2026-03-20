@@ -4,11 +4,11 @@ import sys
 import threading
 
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPainter, QColor, QBrush, QPen
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QPushButton, QLabel, QComboBox, QLineEdit,
-    QGroupBox, QStackedWidget,
+    QGroupBox, QStackedWidget, QSlider,
     QTabWidget, QTabBar, QInputDialog, QMessageBox, QFileDialog, QSpinBox,
     QDialog, QListWidget, QListWidgetItem, QDialogButtonBox,
 )
@@ -127,15 +127,25 @@ class ActionPanel(QWidget):
         self._config = None
         self._button_name = None
         self._layer_id = cfg.DEFAULT_LAYER_ID
+        self._dial_mode_name = "jog"
 
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # Top-level stack: page 0 = button config, page 1 = dial config
+        self._mode_stack = QStackedWidget()
+        outer.addWidget(self._mode_stack)
+
+        # ── Page 0: Button config ──────────────────────────────────────────
+        btn_page = QWidget()
+        layout = QVBoxLayout(btn_page)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.title = QLabel("Select a button to configure")
         self.title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         layout.addWidget(self.title)
 
-        # Two-level action selector: category → specific action
         cat_row = QHBoxLayout()
         cat_row.addWidget(QLabel("Category:"))
         self.category_combo = QComboBox()
@@ -152,9 +162,8 @@ class ActionPanel(QWidget):
         act_row.addWidget(self.action_combo)
         layout.addLayout(act_row)
 
-        self._populate_action_combo(0)   # seed with "None" category
+        self._populate_action_combo(0)
 
-        # Stacked pages per action type
         self.stack = QStackedWidget()
         layout.addWidget(self.stack)
 
@@ -178,7 +187,7 @@ class ActionPanel(QWidget):
         self.hold_input = QLineEdit()
         self.hold_input.setPlaceholderText("alt")
         hold_l.addWidget(self.hold_input)
-        hold_l.addWidget(_wlabel("Held while the Speed Editor button is physically held. Release the button to release the key."))
+        hold_l.addWidget(_wlabel("Held while the controller button is physically held. Release the button to release the key."))
         self.stack.addWidget(hold_page)
 
         # Page 3 — Toggle Hold
@@ -225,7 +234,7 @@ class ActionPanel(QWidget):
         ll.addLayout(launch_row)
         self.stack.addWidget(launch_page)
 
-        # Page 3 — OBS Scene
+        # Page 6 — OBS Scene
         obs_scene_page = QWidget()
         osl = QVBoxLayout(obs_scene_page)
         osl.addWidget(QLabel("Scene name:"))
@@ -237,11 +246,11 @@ class ActionPanel(QWidget):
         osl.addWidget(self.refresh_scenes_btn)
         self.stack.addWidget(obs_scene_page)
 
-        # Pages 4-6 — OBS toggles (no config needed)
+        # Pages 7-9 — OBS toggles (no config needed)
         for label in ["Toggle streaming on/off.", "Toggle recording on/off.", "Toggle mic mute."]:
             self.stack.addWidget(_wlabel(label))
 
-        # Page 7 — Layer Push
+        # Page 10 — Layer Push
         layer_push_page = QWidget()
         lpl = QVBoxLayout(layer_push_page)
         lpl.addWidget(QLabel("Push layer (activate):"))
@@ -249,13 +258,32 @@ class ActionPanel(QWidget):
         lpl.addWidget(self.layer_push_combo)
         self.stack.addWidget(layer_push_page)
 
-        # Layer Back
+        # Page 11 — Layer Back
         self.stack.addWidget(_wlabel("Return to the previous layer."))
 
-        # Dial: System Volume
-        self.stack.addWidget(_wlabel("Turning the dial will adjust the system (master) volume. Pair with Dial: Reset on another button to go back to normal."))
+        # Page 12 — Dial: System Volume (with sensitivity)
+        sv_page = QWidget()
+        sv_l = QVBoxLayout(sv_page)
+        sv_l.addWidget(_wlabel("Turning the dial will adjust the system (master) volume. Pair with Dial: Reset on another button to go back to normal."))
+        sv_sens_hdr = QHBoxLayout()
+        sv_sens_hdr.addWidget(QLabel("Sensitivity:"))
+        self._sys_vol_sens_lbl = QLabel("100")
+        self._sys_vol_sens_lbl.setFixedWidth(30)
+        sv_sens_hdr.addWidget(self._sys_vol_sens_lbl)
+        sv_sens_hdr.addStretch()
+        sv_l.addLayout(sv_sens_hdr)
+        sv_sens_row = QHBoxLayout()
+        sv_sens_row.addWidget(QLabel("0"))
+        self.sys_vol_sensitivity = QSlider(Qt.Orientation.Horizontal)
+        self.sys_vol_sensitivity.setRange(0, 100)
+        self.sys_vol_sensitivity.setValue(100)
+        self.sys_vol_sensitivity.valueChanged.connect(lambda v: self._sys_vol_sens_lbl.setText(str(v)))
+        sv_sens_row.addWidget(self.sys_vol_sensitivity)
+        sv_sens_row.addWidget(QLabel("100"))
+        sv_l.addLayout(sv_sens_row)
+        self.stack.addWidget(sv_page)
 
-        # Dial: App Volume
+        # Page 13 — Dial: App Volume (with sensitivity)
         dial_app_page = QWidget()
         dap_l = QVBoxLayout(dial_app_page)
         dap_l.addWidget(QLabel("App name (partial match, e.g. Spotify):"))
@@ -268,12 +296,47 @@ class ActionPanel(QWidget):
         self.audio_app_list = QComboBox()
         self.audio_app_list.currentTextChanged.connect(lambda t: self.dial_app_input.setText(t))
         dap_l.addWidget(self.audio_app_list)
+        av_sens_hdr = QHBoxLayout()
+        av_sens_hdr.addWidget(QLabel("Sensitivity:"))
+        self._app_vol_sens_lbl = QLabel("100")
+        self._app_vol_sens_lbl.setFixedWidth(30)
+        av_sens_hdr.addWidget(self._app_vol_sens_lbl)
+        av_sens_hdr.addStretch()
+        dap_l.addLayout(av_sens_hdr)
+        av_sens_row = QHBoxLayout()
+        av_sens_row.addWidget(QLabel("0"))
+        self.app_vol_sensitivity = QSlider(Qt.Orientation.Horizontal)
+        self.app_vol_sensitivity.setRange(0, 100)
+        self.app_vol_sensitivity.setValue(100)
+        self.app_vol_sensitivity.valueChanged.connect(lambda v: self._app_vol_sens_lbl.setText(str(v)))
+        av_sens_row.addWidget(self.app_vol_sensitivity)
+        av_sens_row.addWidget(QLabel("100"))
+        dap_l.addLayout(av_sens_row)
         self.stack.addWidget(dial_app_page)
 
-        # Dial: Brightness
-        self.stack.addWidget(_wlabel("Turning the dial will adjust screen brightness. Works best on laptop displays. Some external monitors may not be supported."))
+        # Page 14 — Dial: Brightness (with sensitivity)
+        bright_page = QWidget()
+        bright_l = QVBoxLayout(bright_page)
+        bright_l.addWidget(_wlabel("Turning the dial will adjust screen brightness. Works best on laptop displays. Some external monitors may not be supported."))
+        bright_sens_hdr = QHBoxLayout()
+        bright_sens_hdr.addWidget(QLabel("Sensitivity:"))
+        self._bright_sens_lbl = QLabel("100")
+        self._bright_sens_lbl.setFixedWidth(30)
+        bright_sens_hdr.addWidget(self._bright_sens_lbl)
+        bright_sens_hdr.addStretch()
+        bright_l.addLayout(bright_sens_hdr)
+        bright_sens_row = QHBoxLayout()
+        bright_sens_row.addWidget(QLabel("0"))
+        self.brightness_sensitivity = QSlider(Qt.Orientation.Horizontal)
+        self.brightness_sensitivity.setRange(0, 100)
+        self.brightness_sensitivity.setValue(100)
+        self.brightness_sensitivity.valueChanged.connect(lambda v: self._bright_sens_lbl.setText(str(v)))
+        bright_sens_row.addWidget(self.brightness_sensitivity)
+        bright_sens_row.addWidget(QLabel("100"))
+        bright_l.addLayout(bright_sens_row)
+        self.stack.addWidget(bright_page)
 
-        # Dial: Reset
+        # Page 15 — Dial: Reset
         self.stack.addWidget(_wlabel("Resets the dial back to its normal configured hotkey mode."))
 
         # Save button
@@ -282,8 +345,70 @@ class ActionPanel(QWidget):
         self.save_btn.clicked.connect(self._save)
         layout.addWidget(self.save_btn)
 
+        self._mode_stack.addWidget(btn_page)
+
         self._refresh_windows()
         self._refresh_scenes()
+
+        # ── Page 1: Dial config ────────────────────────────────────────────
+        dial_page = QWidget()
+        dlayout = QVBoxLayout(dial_page)
+        dlayout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        dial_title = QLabel("Dial")
+        dial_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        dlayout.addWidget(dial_title)
+
+        dmode_row = QHBoxLayout()
+        dmode_row.addWidget(QLabel("Mode:"))
+        self.dial_mode_combo = QComboBox()
+        self.dial_mode_combo.addItems(["Jog", "Shuttle", "Scroll"])
+        self.dial_mode_combo.currentIndexChanged.connect(self._on_dial_mode_combo_changed)
+        dmode_row.addWidget(self.dial_mode_combo)
+        dmode_row.addStretch()
+        dlayout.addLayout(dmode_row)
+
+        dlayout.addSpacing(6)
+        left_lbl = QLabel("↺  Left / Counter-clockwise")
+        left_lbl.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+        dlayout.addWidget(left_lbl)
+        self.dial_left_input = QLineEdit()
+        self.dial_left_input.setPlaceholderText("e.g. left")
+        dlayout.addWidget(self.dial_left_input)
+
+        dlayout.addSpacing(4)
+        right_lbl = QLabel("↻  Right / Clockwise")
+        right_lbl.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+        dlayout.addWidget(right_lbl)
+        self.dial_right_input = QLineEdit()
+        self.dial_right_input.setPlaceholderText("e.g. right")
+        dlayout.addWidget(self.dial_right_input)
+
+        dlayout.addSpacing(8)
+        dial_sens_hdr = QHBoxLayout()
+        dial_sens_hdr.addWidget(QLabel("Sensitivity:"))
+        self.dial_sens_val_lbl = QLabel("100")
+        self.dial_sens_val_lbl.setFixedWidth(30)
+        dial_sens_hdr.addWidget(self.dial_sens_val_lbl)
+        dial_sens_hdr.addStretch()
+        dlayout.addLayout(dial_sens_hdr)
+        dial_sens_row = QHBoxLayout()
+        dial_sens_row.addWidget(QLabel("0"))
+        self.dial_sensitivity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.dial_sensitivity_slider.setRange(0, 100)
+        self.dial_sensitivity_slider.setValue(100)
+        self.dial_sensitivity_slider.valueChanged.connect(
+            lambda v: self.dial_sens_val_lbl.setText(str(v)))
+        dial_sens_row.addWidget(self.dial_sensitivity_slider)
+        dial_sens_row.addWidget(QLabel("100"))
+        dlayout.addLayout(dial_sens_row)
+
+        dlayout.addSpacing(8)
+        dial_save_btn = QPushButton("Save")
+        dial_save_btn.clicked.connect(self._save)
+        dlayout.addWidget(dial_save_btn)
+
+        self._mode_stack.addWidget(dial_page)
 
     def _populate_action_combo(self, cat_idx: int):
         self.action_combo.blockSignals(True)
@@ -356,7 +481,43 @@ class ActionPanel(QWidget):
         for lid, lname in layers:
             self.layer_push_combo.addItem(lname, lid)
 
+    def set_layer(self, layer_id: str, config: dict):
+        """Called when the active layer changes; refreshes dial panel if visible."""
+        self._layer_id = layer_id
+        self._config = config
+        if self._mode_stack.currentIndex() == 1:
+            self._load_dial_for_mode(self._dial_mode_name)
+
+    def load_dial(self, config: dict, layer_id: str):
+        """Switch to dial config mode and load values for the current dial mode."""
+        self._config = config
+        self._layer_id = layer_id
+        self._mode_stack.setCurrentIndex(1)
+        self.dial_mode_combo.blockSignals(True)
+        self.dial_mode_combo.setCurrentIndex(["jog", "shuttle", "scroll"].index(self._dial_mode_name))
+        self.dial_mode_combo.blockSignals(False)
+        self._load_dial_for_mode(self._dial_mode_name)
+
+    def _load_dial_for_mode(self, mode: str):
+        left  = cfg.get_dial_action(self._config, mode, "left",  self._layer_id)
+        right = cfg.get_dial_action(self._config, mode, "right", self._layer_id)
+        self.dial_left_input.setText(
+            left.get("keys", "") if left.get("action") == cfg.ACTION_HOTKEY else "")
+        self.dial_right_input.setText(
+            right.get("keys", "") if right.get("action") == cfg.ACTION_HOTKEY else "")
+        sensitivity = cfg.get_dial_sensitivity(self._config, mode, self._layer_id)
+        self.dial_sensitivity_slider.blockSignals(True)
+        self.dial_sensitivity_slider.setValue(sensitivity)
+        self.dial_sensitivity_slider.blockSignals(False)
+        self.dial_sens_val_lbl.setText(str(sensitivity))
+
+    def _on_dial_mode_combo_changed(self, idx: int):
+        self._dial_mode_name = ["jog", "shuttle", "scroll"][idx]
+        if self._config:
+            self._load_dial_for_mode(self._dial_mode_name)
+
     def load_button(self, button_name: str, config: dict, layer_id: str = cfg.DEFAULT_LAYER_ID):
+        self._mode_stack.setCurrentIndex(0)
         self._button_name = button_name
         self._config = config
         self._layer_id = layer_id
@@ -407,10 +568,42 @@ class ActionPanel(QWidget):
                 if self.layer_push_combo.itemData(i) == target:
                     self.layer_push_combo.setCurrentIndex(i)
                     break
-        elif atype == cfg.ACTION_DIAL_MODE and action.get("mode") == "app_vol":
-            self.dial_app_input.setText(action.get("app", ""))
+        elif atype == cfg.ACTION_DIAL_MODE:
+            sensitivity = action.get("sensitivity", 100)
+            mode = action.get("mode")
+            if mode == "sys_vol":
+                self.sys_vol_sensitivity.setValue(sensitivity)
+            elif mode == "app_vol":
+                self.dial_app_input.setText(action.get("app", ""))
+                self.app_vol_sensitivity.setValue(sensitivity)
+            elif mode == "brightness":
+                self.brightness_sensitivity.setValue(sensitivity)
 
     def _save(self):
+        # Dial circle config save
+        if self._mode_stack.currentIndex() == 1:
+            if not self._config:
+                return
+            mode = self._dial_mode_name
+            left_keys  = self.dial_left_input.text().strip()
+            right_keys = self.dial_right_input.text().strip()
+            cfg.set_dial_action(self._config, mode, "left",
+                                {"action": cfg.ACTION_HOTKEY, "keys": left_keys}
+                                if left_keys else {"action": cfg.ACTION_NONE},
+                                self._layer_id)
+            cfg.set_dial_action(self._config, mode, "right",
+                                {"action": cfg.ACTION_HOTKEY, "keys": right_keys}
+                                if right_keys else {"action": cfg.ACTION_NONE},
+                                self._layer_id)
+            cfg.set_dial_sensitivity(self._config, mode,
+                                     self.dial_sensitivity_slider.value(), self._layer_id)
+            cfg.save(self._config)
+            self.saved.emit()
+            return
+
+        # Button config save
+        if not self._button_name:
+            return
         idx = self._current_flat_idx()
         if idx == 0:
             action = {"action": cfg.ACTION_NONE}
@@ -438,12 +631,15 @@ class ActionPanel(QWidget):
         elif idx == 11:
             action = {"action": cfg.ACTION_LAYER_POP}
         elif idx == 12:
-            action = {"action": cfg.ACTION_DIAL_MODE, "mode": "sys_vol"}
+            action = {"action": cfg.ACTION_DIAL_MODE, "mode": "sys_vol",
+                      "sensitivity": self.sys_vol_sensitivity.value()}
         elif idx == 13:
             action = {"action": cfg.ACTION_DIAL_MODE, "mode": "app_vol",
-                      "app": self.dial_app_input.text().strip()}
+                      "app": self.dial_app_input.text().strip(),
+                      "sensitivity": self.app_vol_sensitivity.value()}
         elif idx == 14:
-            action = {"action": cfg.ACTION_DIAL_MODE, "mode": "brightness"}
+            action = {"action": cfg.ACTION_DIAL_MODE, "mode": "brightness",
+                      "sensitivity": self.brightness_sensitivity.value()}
         elif idx == 15:
             action = {"action": cfg.ACTION_DIAL_MODE, "mode": "normal"}
         else:
@@ -461,76 +657,6 @@ class ActionPanel(QWidget):
         cfg.save(self._config)
         self.saved.emit()
 
-
-# ---------------------------------------------------------------------------
-# Dial config widget
-# ---------------------------------------------------------------------------
-
-class DialConfigWidget(QWidget):
-    def __init__(self, config: dict, parent=None):
-        super().__init__(parent)
-        self._config = config
-        self._layer_id = cfg.DEFAULT_LAYER_ID
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(4)
-
-        header = QLabel("Dial")
-        header.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        layout.addWidget(header)
-
-        grid = QGridLayout()
-        grid.setSpacing(6)
-        grid.addWidget(QLabel("Left"), 0, 1)
-        grid.addWidget(QLabel("Right"), 0, 2)
-        thresh_hdr = QLabel("Threshold")
-        thresh_hdr.setToolTip("Ticks to accumulate before firing (1 = every tick, higher = less sensitive)")
-        grid.addWidget(thresh_hdr, 0, 3)
-
-        self._inputs = {}       # (mode, direction) → QLineEdit
-        self._sensitivity = {}  # mode → QSpinBox
-        for row, (mode, label) in enumerate([("jog", "Jog"), ("shuttle", "Shuttle"), ("scroll", "Scroll")], 1):
-            grid.addWidget(QLabel(f"{label}:"), row, 0)
-            for col, direction in [(1, "left"), (2, "right")]:
-                inp = QLineEdit()
-                inp.setPlaceholderText("e.g. left")
-                inp.setFixedWidth(100)
-                grid.addWidget(inp, row, col)
-                self._inputs[(mode, direction)] = inp
-            spin = QSpinBox()
-            spin.setRange(1, 20)
-            spin.setValue(1)
-            spin.setFixedWidth(55)
-            spin.setToolTip("Ticks per action: higher = less sensitive")
-            grid.addWidget(spin, row, 3)
-            self._sensitivity[mode] = spin
-
-        save_btn = QPushButton("Save")
-        save_btn.clicked.connect(self._save)
-        grid.addWidget(save_btn, 4, 0, 1, 4)
-
-        layout.addLayout(grid)
-
-    def set_layer(self, layer_id: str):
-        self._layer_id = layer_id
-        self._load()
-
-    def _load(self):
-        for (mode, direction), inp in self._inputs.items():
-            action = cfg.get_dial_action(self._config, mode, direction, self._layer_id)
-            inp.setText(action.get("keys", "") if action.get("action") == cfg.ACTION_HOTKEY else "")
-        for mode, spin in self._sensitivity.items():
-            spin.setValue(cfg.get_dial_sensitivity(self._config, mode, self._layer_id))
-
-    def _save(self):
-        for (mode, direction), inp in self._inputs.items():
-            text = inp.text().strip()
-            action = {"action": cfg.ACTION_HOTKEY, "keys": text} if text else {"action": cfg.ACTION_NONE}
-            cfg.set_dial_action(self._config, mode, direction, action, self._layer_id)
-        for mode, spin in self._sensitivity.items():
-            cfg.set_dial_sensitivity(self._config, mode, spin.value(), self._layer_id)
-        cfg.save(self._config)
 
 
 # ---------------------------------------------------------------------------
@@ -806,8 +932,52 @@ def _apply_btn_style(btn: QPushButton, key_name: str, original_label: str,
     """)
 
 
+# ---------------------------------------------------------------------------
+# Dial circle widget — visual representation of the jog wheel
+# ---------------------------------------------------------------------------
+
+class DialCircle(QWidget):
+    clicked = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._selected = False
+        self._active = False
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(70, 70)
+        self.setToolTip("Dial / Jog Wheel — click to configure")
+
+    def set_selected(self, v: bool):
+        self._selected = v
+        self.update()
+
+    def set_active(self, v: bool):
+        self._active = v
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        margin = 4
+        rect = self.rect().adjusted(margin, margin, -margin, -margin)
+        fill = QColor("#9a3a9a") if self._active else QColor("#3a3a3a")
+        border_color = QColor("#ffffff") if self._selected else QColor("#888888")
+        pen_width = 2 if self._selected else 1
+        painter.setBrush(QBrush(fill))
+        painter.setPen(QPen(border_color, pen_width))
+        painter.drawEllipse(rect)
+        painter.setPen(QPen(QColor("white")))
+        painter.setFont(QFont("Arial", 8))
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "DIAL")
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+
+
 class SpeedEditorWidget(QWidget):
     button_clicked = pyqtSignal(str)
+    dial_clicked   = pyqtSignal()
 
     def __init__(self, config: dict, parent=None):
         super().__init__(parent)
@@ -826,6 +996,17 @@ class SpeedEditorWidget(QWidget):
         layout.addWidget(self._make_grid(_LEFT,   6, spacer_row=2))
         layout.addWidget(self._make_grid(_MIDDLE, 8, spacer_row=2))
         layout.addWidget(self._make_right())
+
+        # Dial circle
+        self._dial_circle = DialCircle()
+        self._dial_circle.clicked.connect(self._on_dial_click)
+        dial_container = QWidget()
+        dc_layout = QVBoxLayout(dial_container)
+        dc_layout.setContentsMargins(0, 0, 0, 0)
+        dc_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        dc_layout.addWidget(self._dial_circle)
+        layout.addWidget(dial_container)
+
         layout.addStretch()
 
     def _make_grid(self, defs, num_subcols, spacer_row=None):
@@ -867,6 +1048,8 @@ class SpeedEditorWidget(QWidget):
         return widget
 
     def _on_click(self, key_name: str):
+        # Deselect dial circle if it was selected
+        self._dial_circle.set_selected(False)
         if self._selected:
             old = self._btn_widgets.get(self._selected)
             if old:
@@ -882,6 +1065,19 @@ class SpeedEditorWidget(QWidget):
                          dial_active=(key_name == self._active_dial_btn))
         self.button_clicked.emit(key_name)
 
+    def _on_dial_click(self):
+        # Deselect any selected button
+        if self._selected:
+            old = self._btn_widgets.get(self._selected)
+            if old:
+                old.setChecked(False)
+                _apply_btn_style(old, self._selected, self._btn_labels.get(self._selected, self._selected),
+                                 self._config, self._layer_id,
+                                 dial_active=(self._selected == self._active_dial_btn))
+            self._selected = None
+        self._dial_circle.set_selected(True)
+        self.dial_clicked.emit()
+
     def highlight(self, key_name: str):
         if key_name in self._btn_widgets:
             self._on_click(key_name)
@@ -892,6 +1088,7 @@ class SpeedEditorWidget(QWidget):
 
     def set_dial_btn(self, key_name: str | None):
         self._active_dial_btn = key_name
+        self._dial_circle.set_active(key_name is not None)
         self.refresh_all_styles()
 
     def refresh_all_styles(self):
@@ -950,6 +1147,7 @@ class MainWindow(QMainWindow):
         editor_row = QHBoxLayout()
         self.se_widget = SpeedEditorWidget(self._config)
         self.se_widget.button_clicked.connect(self._select_button)
+        self.se_widget.dial_clicked.connect(self._select_dial)
         editor_row.addWidget(self.se_widget, stretch=1)
 
         # Right: action config panel
@@ -960,15 +1158,6 @@ class MainWindow(QMainWindow):
         btab_layout.addLayout(editor_row)
 
         tabs.addTab(buttons_tab, "Buttons")
-
-        # --- Dial tab (created before _populate_layer_tabs so set_layer works) ---
-        dial_outer = QWidget()
-        dial_outer_layout = QVBoxLayout(dial_outer)
-        dial_outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        dial_outer_layout.setContentsMargins(16, 16, 16, 16)
-        self.dial_widget = DialConfigWidget(self._config)
-        dial_outer_layout.addWidget(self.dial_widget)
-        tabs.addTab(dial_outer, "Dial")
 
         self._runtime_layer_id = cfg.DEFAULT_LAYER_ID
         self._populate_layer_tabs()
@@ -1018,16 +1207,16 @@ class MainWindow(QMainWindow):
         self.layer_tabs.blockSignals(False)
         self.action_panel.refresh_layers(layers)
         self.delete_layer_btn.setEnabled(self._layer_id != cfg.DEFAULT_LAYER_ID)
-        self.se_widget.set_layer(self._layer_id)  # always sync button labels
-        self.dial_widget.set_layer(self._layer_id)
+        self.se_widget.set_layer(self._layer_id)
+        self.action_panel.set_layer(self._layer_id, self._config)
 
     def _on_layer_tab_changed(self, index: int):
         if index < 0:
             return
         self._layer_id = self.layer_tabs.tabData(index)
         self.se_widget.set_layer(self._layer_id)
-        self.dial_widget.set_layer(self._layer_id)
-        self._refresh_tab_texts()   # move ▶ to newly selected tab
+        self.action_panel.set_layer(self._layer_id, self._config)
+        self._refresh_tab_texts()
         self.delete_layer_btn.setEnabled(self._layer_id != cfg.DEFAULT_LAYER_ID)
 
     def _on_runtime_layer_changed(self, layer_id: str):
@@ -1035,7 +1224,7 @@ class MainWindow(QMainWindow):
         self._runtime_layer_id = layer_id
         self._layer_id = layer_id
         self.se_widget.set_layer(layer_id)
-        self.dial_widget.set_layer(layer_id)
+        self.action_panel.set_layer(layer_id, self._config)
         for i in range(self.layer_tabs.count()):
             if self.layer_tabs.tabData(i) == layer_id:
                 self.layer_tabs.blockSignals(True)
@@ -1100,6 +1289,9 @@ class MainWindow(QMainWindow):
 
     def _select_button(self, key_name: str):
         self.action_panel.load_button(key_name, self._config, self._layer_id)
+
+    def _select_dial(self):
+        self.action_panel.load_dial(self._config, self._layer_id)
 
     def _on_button_pressed(self, key_name: str):
         self.se_widget.highlight(key_name)

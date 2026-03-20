@@ -28,17 +28,17 @@ def main():
     # Toggle-hold state: button_name → keys_str currently latched
     _toggle_holds: dict = {}
 
-    # Dial override: None = normal (use layer config), else {"mode": ..., "app": ...}
+    # Dial override: None = normal (use layer config), else {"mode": ..., "app": ..., "sensitivity": ...}
     _dial_override: dict | None = None
 
-    def _set_dial_override(mode: str, app: str = ""):
+    def _set_dial_override(mode: str, app: str = "", sensitivity: int = 100):
         nonlocal _dial_override
         if mode == "normal":
             _dial_override = None
             print('[dial] reset to normal')
         else:
-            _dial_override = {"mode": mode, "app": app}
-            print(f'[dial] override → mode={mode!r} app={app!r}')
+            _dial_override = {"mode": mode, "app": app, "sensitivity": sensitivity}
+            print(f'[dial] override → mode={mode!r} app={app!r} sensitivity={sensitivity}')
 
     def _current_layer():
         return _layer_stack[-1]
@@ -86,7 +86,7 @@ def main():
                     _set_dial_override("normal")
                     signals.dial_mode_changed.emit("", "")
                 else:
-                    _set_dial_override(mode, action.get("app", ""))
+                    _set_dial_override(mode, action.get("app", ""), action.get("sensitivity", 100))
                     signals.dial_mode_changed.emit(mode, key_name)
             else:
                 application.dispatch(key_name, config, _current_layer(),
@@ -133,7 +133,18 @@ def main():
                 return
             _last_shuttle_fire[0] = now
 
-        threshold = cfg.get_dial_sensitivity(config, mode_name, _current_layer())
+        # Get sensitivity (0-100): from override action if active, else from config
+        if _dial_override:
+            sensitivity = _dial_override.get("sensitivity", 100)
+        else:
+            sensitivity = cfg.get_dial_sensitivity(config, mode_name, _current_layer())
+
+        if sensitivity == 0:
+            return  # dial disabled for this mapping
+
+        # Map sensitivity 0-100 → threshold (ticks per action): 100→1, 1→20
+        threshold = max(1, round(20 * (100 - sensitivity) / 100))
+
         _jog_accum[mode_name] += 1 if value > 0 else -1
 
         if _jog_accum[mode_name] >= threshold:

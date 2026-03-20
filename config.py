@@ -81,11 +81,18 @@ def get_button(config: dict, button_name: str, layer_id: str = DEFAULT_LAYER_ID)
 
 
 def get_dial_sensitivity(config: dict, mode: str, layer_id: str = DEFAULT_LAYER_ID) -> int:
-    """Return ticks-per-action threshold for this dial mode (default 1)."""
-    return (config["layers"]
-            .get(layer_id, {})
-            .get("dial_sensitivity", {})
-            .get(mode, 1))
+    """Return sensitivity 0-100 for this dial mode (default 100 = max sensitive).
+    Migrates old threshold format (1-20) automatically."""
+    raw = (config["layers"]
+           .get(layer_id, {})
+           .get("dial_sensitivity", {})
+           .get(mode, None))
+    if raw is None:
+        return 100
+    # Migrate old threshold format (1-20): threshold 1 → 100, threshold 20 → 0
+    if raw <= 20:
+        return max(0, round(100 - (raw - 1) * 100 / 19))
+    return raw  # already 0-100
 
 
 def set_dial_sensitivity(config: dict, mode: str, threshold: int, layer_id: str = DEFAULT_LAYER_ID):
