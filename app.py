@@ -68,6 +68,58 @@ _FLAT_TO_CAT = {
 # ---------------------------------------------------------------------------
 
 
+class NewLayerDialog(QDialog):
+    """Asks for a new layer name and optionally a layer to copy from."""
+
+    _BLANK = "— Blank layer —"
+
+    def __init__(self, existing_layers: list[tuple[str, str]], parent=None):
+        """existing_layers: [(layer_id, layer_name), ...]"""
+        super().__init__(parent)
+        self.setWindowTitle("New Layer")
+        self.setFixedWidth(320)
+        self.layer_name  = ""   # result: name entered by user
+        self.copy_from   = None  # result: layer_id to copy from, or None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel("Layer name:"))
+        self._name_edit = QLineEdit()
+        self._name_edit.setPlaceholderText("e.g. Editing, Gaming…")
+        layout.addWidget(self._name_edit)
+
+        layout.addWidget(QLabel("Start from:"))
+        self._list = QListWidget()
+        blank_item = QListWidgetItem(self._BLANK)
+        blank_item.setData(Qt.ItemDataRole.UserRole, None)
+        self._list.addItem(blank_item)
+        for lid, lname in existing_layers:
+            item = QListWidgetItem(f"Copy of '{lname}'")
+            item.setData(Qt.ItemDataRole.UserRole, lid)
+            self._list.addItem(item)
+        self._list.setCurrentRow(0)
+        self._list.setFixedHeight(min(160, 36 + 24 * self._list.count()))
+        layout.addWidget(self._list)
+
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._name_edit.setFocus()
+
+    def _on_accept(self):
+        name = self._name_edit.text().strip()
+        if not name:
+            self._name_edit.setPlaceholderText("Please enter a name")
+            return
+        self.layer_name = name
+        item = self._list.currentItem()
+        self.copy_from = item.data(Qt.ItemDataRole.UserRole) if item else None
+        self.accept()
+
+
 class AppPickerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1490,16 +1542,22 @@ class MainWindow(QMainWindow):
         self.delete_layer_btn.setEnabled(layer_id != cfg.DEFAULT_LAYER_ID)
 
     def _new_layer(self):
-        name, ok = QInputDialog.getText(self, "New Layer", "Layer name:")
-        if ok and name.strip():
-            cfg.add_layer(self._config, name.strip())
-            cfg.save(self._config)
-            self._populate_layer_tabs()
-            for i in range(self.layer_tabs.count()):
-                lid = self.layer_tabs.tabData(i)
-                if self._config["layers"].get(lid, {}).get("name") == name.strip():
-                    self.layer_tabs.setCurrentIndex(i)
-                    break
+        existing = cfg.get_layers(self._config)
+        dlg = NewLayerDialog(existing, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        new_id = cfg.add_layer(self._config, dlg.layer_name)
+        if dlg.copy_from:
+            import json as _json
+            source = self._config["layers"].get(dlg.copy_from, {})
+            self._config["layers"][new_id] = _json.loads(_json.dumps(source))
+            self._config["layers"][new_id]["name"] = dlg.layer_name
+        cfg.save(self._config)
+        self._populate_layer_tabs()
+        for i in range(self.layer_tabs.count()):
+            if self.layer_tabs.tabData(i) == new_id:
+                self.layer_tabs.setCurrentIndex(i)
+                break
 
     def _rename_layer(self):
         current_name = self.layer_tabs.tabText(self.layer_tabs.currentIndex()).lstrip("▶ ")
