@@ -135,6 +135,10 @@ def main():
 
         # Get sensitivity (0-100): from override action if active, else from config
         if _dial_override:
+            # Only fire if hardware mode matches what the user configured
+            hw_mode = _dial_override.get("hw_mode", "Jog").lower()
+            if hw_mode != mode_name:
+                return
             sensitivity = _dial_override.get("sensitivity", 100)
         else:
             sensitivity = cfg.get_dial_sensitivity(config, mode_name, _current_layer())

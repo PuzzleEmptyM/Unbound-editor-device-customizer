@@ -50,6 +50,12 @@ CATEGORY_ACTIONS = [
 ]
 
 # flat_stack_index → (category_idx, action_idx_within_category)
+_DIAL_HW_MODE_DESCS = {
+    "Jog":     "Each wheel click fires once. Best for precise, step-by-step adjustments.",
+    "Shuttle": "Fires repeatedly while held off-center. Best for large, continuous sweeping changes.",
+    "Scroll":  "Similar to Jog — fires once per click with a slightly different wheel feel.",
+}
+
 _FLAT_TO_CAT = {
     fidx: (ci, ai)
     for ci, (_, acts) in enumerate(CATEGORY_ACTIONS)
@@ -261,10 +267,21 @@ class ActionPanel(QWidget):
         # Page 11 — Layer Back
         self.stack.addWidget(_wlabel("Return to the previous layer."))
 
-        # Page 12 — Dial: System Volume (with sensitivity)
+        # Page 12 — Dial: System Volume
         sv_page = QWidget()
         sv_l = QVBoxLayout(sv_page)
         sv_l.addWidget(_wlabel("Turning the dial will adjust the system (master) volume. Pair with Dial: Reset on another button to go back to normal."))
+        sv_l.addWidget(QLabel("Hardware Mode:"))
+        self.sys_vol_hw_mode = QComboBox()
+        self.sys_vol_hw_mode.addItems(["Jog", "Shuttle", "Scroll"])
+        sv_l.addWidget(self.sys_vol_hw_mode)
+        self._sys_vol_mode_desc = QLabel(_DIAL_HW_MODE_DESCS["Jog"])
+        self._sys_vol_mode_desc.setWordWrap(True)
+        self._sys_vol_mode_desc.setStyleSheet("color: #aaaaaa; font-size: 11px;")
+        self.sys_vol_hw_mode.currentTextChanged.connect(
+            lambda t: self._sys_vol_mode_desc.setText(_DIAL_HW_MODE_DESCS.get(t, "")))
+        sv_l.addWidget(self._sys_vol_mode_desc)
+        sv_l.addSpacing(4)
         sv_sens_hdr = QHBoxLayout()
         sv_sens_hdr.addWidget(QLabel("Sensitivity:"))
         self._sys_vol_sens_lbl = QLabel("100")
@@ -283,7 +300,7 @@ class ActionPanel(QWidget):
         sv_l.addLayout(sv_sens_row)
         self.stack.addWidget(sv_page)
 
-        # Page 13 — Dial: App Volume (with sensitivity)
+        # Page 13 — Dial: App Volume
         dial_app_page = QWidget()
         dap_l = QVBoxLayout(dial_app_page)
         dap_l.addWidget(QLabel("App name (partial match, e.g. Spotify):"))
@@ -296,6 +313,17 @@ class ActionPanel(QWidget):
         self.audio_app_list = QComboBox()
         self.audio_app_list.currentTextChanged.connect(lambda t: self.dial_app_input.setText(t))
         dap_l.addWidget(self.audio_app_list)
+        dap_l.addWidget(QLabel("Hardware Mode:"))
+        self.app_vol_hw_mode = QComboBox()
+        self.app_vol_hw_mode.addItems(["Jog", "Shuttle", "Scroll"])
+        dap_l.addWidget(self.app_vol_hw_mode)
+        self._app_vol_mode_desc = QLabel(_DIAL_HW_MODE_DESCS["Jog"])
+        self._app_vol_mode_desc.setWordWrap(True)
+        self._app_vol_mode_desc.setStyleSheet("color: #aaaaaa; font-size: 11px;")
+        self.app_vol_hw_mode.currentTextChanged.connect(
+            lambda t: self._app_vol_mode_desc.setText(_DIAL_HW_MODE_DESCS.get(t, "")))
+        dap_l.addWidget(self._app_vol_mode_desc)
+        dap_l.addSpacing(4)
         av_sens_hdr = QHBoxLayout()
         av_sens_hdr.addWidget(QLabel("Sensitivity:"))
         self._app_vol_sens_lbl = QLabel("100")
@@ -314,10 +342,21 @@ class ActionPanel(QWidget):
         dap_l.addLayout(av_sens_row)
         self.stack.addWidget(dial_app_page)
 
-        # Page 14 — Dial: Brightness (with sensitivity)
+        # Page 14 — Dial: Brightness
         bright_page = QWidget()
         bright_l = QVBoxLayout(bright_page)
         bright_l.addWidget(_wlabel("Turning the dial will adjust screen brightness. Works best on laptop displays. Some external monitors may not be supported."))
+        bright_l.addWidget(QLabel("Hardware Mode:"))
+        self.brightness_hw_mode = QComboBox()
+        self.brightness_hw_mode.addItems(["Jog", "Shuttle", "Scroll"])
+        bright_l.addWidget(self.brightness_hw_mode)
+        self._bright_mode_desc = QLabel(_DIAL_HW_MODE_DESCS["Jog"])
+        self._bright_mode_desc.setWordWrap(True)
+        self._bright_mode_desc.setStyleSheet("color: #aaaaaa; font-size: 11px;")
+        self.brightness_hw_mode.currentTextChanged.connect(
+            lambda t: self._bright_mode_desc.setText(_DIAL_HW_MODE_DESCS.get(t, "")))
+        bright_l.addWidget(self._bright_mode_desc)
+        bright_l.addSpacing(4)
         bright_sens_hdr = QHBoxLayout()
         bright_sens_hdr.addWidget(QLabel("Sensitivity:"))
         self._bright_sens_lbl = QLabel("100")
@@ -570,14 +609,18 @@ class ActionPanel(QWidget):
                     break
         elif atype == cfg.ACTION_DIAL_MODE:
             sensitivity = action.get("sensitivity", 100)
+            hw_mode = action.get("hw_mode", "Jog")
             mode = action.get("mode")
             if mode == "sys_vol":
                 self.sys_vol_sensitivity.setValue(sensitivity)
+                self.sys_vol_hw_mode.setCurrentText(hw_mode)
             elif mode == "app_vol":
                 self.dial_app_input.setText(action.get("app", ""))
                 self.app_vol_sensitivity.setValue(sensitivity)
+                self.app_vol_hw_mode.setCurrentText(hw_mode)
             elif mode == "brightness":
                 self.brightness_sensitivity.setValue(sensitivity)
+                self.brightness_hw_mode.setCurrentText(hw_mode)
 
     def _save(self):
         # Dial circle config save
@@ -632,13 +675,16 @@ class ActionPanel(QWidget):
             action = {"action": cfg.ACTION_LAYER_POP}
         elif idx == 12:
             action = {"action": cfg.ACTION_DIAL_MODE, "mode": "sys_vol",
+                      "hw_mode": self.sys_vol_hw_mode.currentText(),
                       "sensitivity": self.sys_vol_sensitivity.value()}
         elif idx == 13:
             action = {"action": cfg.ACTION_DIAL_MODE, "mode": "app_vol",
                       "app": self.dial_app_input.text().strip(),
+                      "hw_mode": self.app_vol_hw_mode.currentText(),
                       "sensitivity": self.app_vol_sensitivity.value()}
         elif idx == 14:
             action = {"action": cfg.ACTION_DIAL_MODE, "mode": "brightness",
+                      "hw_mode": self.brightness_hw_mode.currentText(),
                       "sensitivity": self.brightness_sensitivity.value()}
         elif idx == 15:
             action = {"action": cfg.ACTION_DIAL_MODE, "mode": "normal"}
@@ -944,7 +990,7 @@ class DialCircle(QWidget):
         self._selected = False
         self._active = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedSize(70, 70)
+        self.setFixedSize(300, 300)
         self.setToolTip("Dial / Jog Wheel — click to configure")
 
     def set_selected(self, v: bool):
@@ -995,17 +1041,18 @@ class SpeedEditorWidget(QWidget):
 
         layout.addWidget(self._make_grid(_LEFT,   6, spacer_row=2))
         layout.addWidget(self._make_grid(_MIDDLE, 8, spacer_row=2))
-        layout.addWidget(self._make_right())
 
-        # Dial circle
+        # Right section + dial circle stacked vertically
         self._dial_circle = DialCircle()
         self._dial_circle.clicked.connect(self._on_dial_click)
-        dial_container = QWidget()
-        dc_layout = QVBoxLayout(dial_container)
-        dc_layout.setContentsMargins(0, 0, 0, 0)
-        dc_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        dc_layout.addWidget(self._dial_circle)
-        layout.addWidget(dial_container)
+        right_col = QWidget()
+        right_col_layout = QVBoxLayout(right_col)
+        right_col_layout.setContentsMargins(0, 0, 0, 0)
+        right_col_layout.setSpacing(0)
+        right_col_layout.addWidget(self._make_right())
+        right_col_layout.addSpacing(48)
+        right_col_layout.addWidget(self._dial_circle, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(right_col)
 
         layout.addStretch()
 
