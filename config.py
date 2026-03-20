@@ -168,5 +168,13 @@ def get_layers(config: dict) -> list[tuple[str, str]]:
     return layers
 
 
+def load_profile_into_working(config: dict, layers: dict):
+    """Replace working layers with the given layers dict (deep-copied).
+    Ensures the default layer always exists.  Does NOT save to disk."""
+    config["layers"] = _deep_copy(layers)
+    if DEFAULT_LAYER_ID not in config["layers"]:
+        config["layers"][DEFAULT_LAYER_ID] = {"name": "Default", "buttons": {}}
+
+
 def _deep_copy(d):
     return json.loads(json.dumps(d))

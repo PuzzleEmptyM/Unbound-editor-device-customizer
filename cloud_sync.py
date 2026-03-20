@@ -101,3 +101,51 @@ def delete_layer(layer_id: str) -> None:
         timeout=_TIMEOUT,
     )
     r.raise_for_status()
+
+
+# ---------------------------------------------------------------------------
+# Profiles  (named snapshots of the full layers config, stored in /api/configs)
+# ---------------------------------------------------------------------------
+
+def fetch_profiles() -> list[dict]:
+    """Returns list of {name, data, updated_at} dicts from the server."""
+    _check()
+    r = _requests.get(f"{API_BASE}/api/configs", headers=_headers(), timeout=_TIMEOUT)
+    r.raise_for_status()
+    return r.json().get("configs", [])
+
+
+def save_profile_to_cloud(config: dict, name: str) -> None:
+    """Saves current layers to the server under a named profile slot."""
+    _check()
+    r = _requests.post(
+        f"{API_BASE}/api/configs",
+        json={"name": name, "data": {"layers": config["layers"]}},
+        headers=_headers(),
+        timeout=_TIMEOUT,
+    )
+    r.raise_for_status()
+
+
+def delete_profile_from_cloud(name: str) -> None:
+    """Removes a named profile from the server."""
+    _check()
+    r = _requests.delete(
+        f"{API_BASE}/api/configs",
+        params={"name": name},
+        headers=_headers(),
+        timeout=_TIMEOUT,
+    )
+    r.raise_for_status()
+
+
+def load_profile_from_cloud(config: dict, name: str) -> None:
+    """Fetches a named profile, replaces working layers, and saves to disk."""
+    profiles = fetch_profiles()
+    for p in profiles:
+        if p["name"] == name:
+            layers = p["data"].get("layers", {})
+            cfg.load_profile_into_working(config, layers)
+            cfg.save(config)
+            return
+    raise ValueError(f"Profile '{name}' not found.")

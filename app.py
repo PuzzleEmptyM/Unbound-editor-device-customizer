@@ -712,6 +712,8 @@ class ActionPanel(QWidget):
 # ---------------------------------------------------------------------------
 
 class SettingsTab(QWidget):
+    profile_loaded = pyqtSignal()   # emitted when a profile replaces the working layers
+
     def __init__(self, config: dict, parent=None):
         super().__init__(parent)
         self._config = config
@@ -743,6 +745,50 @@ class SettingsTab(QWidget):
 
         layout.addWidget(account_group)
         self._refresh_account_ui()
+
+        # ── Profiles ──────────────────────────────────────────────────────────
+        profiles_group = QGroupBox("Profiles")
+        profiles_layout = QVBoxLayout(profiles_group)
+
+        profiles_layout.addWidget(QLabel(
+            "A profile is a named snapshot of all your layers. "
+            "Profiles are saved to your account (sign in required).\n"
+            "Use Export / Import to share profiles without an account."
+        ))
+
+        self._profiles_list = QListWidget()
+        self._profiles_list.setFixedHeight(140)
+        profiles_layout.addWidget(self._profiles_list)
+
+        prof_btn_row1 = QHBoxLayout()
+        self._save_profile_btn   = QPushButton("Save Current…")
+        self._load_profile_btn   = QPushButton("Load Selected")
+        self._delete_profile_btn = QPushButton("Delete Selected")
+        prof_btn_row1.addWidget(self._save_profile_btn)
+        prof_btn_row1.addWidget(self._load_profile_btn)
+        prof_btn_row1.addWidget(self._delete_profile_btn)
+        profiles_layout.addLayout(prof_btn_row1)
+
+        prof_btn_row2 = QHBoxLayout()
+        self._refresh_profiles_btn = QPushButton("Refresh")
+        self._export_profile_btn   = QPushButton("Export JSON…")
+        self._import_profile_btn   = QPushButton("Import JSON…")
+        prof_btn_row2.addWidget(self._refresh_profiles_btn)
+        prof_btn_row2.addWidget(self._export_profile_btn)
+        prof_btn_row2.addWidget(self._import_profile_btn)
+        profiles_layout.addLayout(prof_btn_row2)
+
+        self._profiles_status = QLabel("")
+        profiles_layout.addWidget(self._profiles_status)
+
+        self._save_profile_btn.clicked.connect(self._save_profile)
+        self._load_profile_btn.clicked.connect(self._load_profile)
+        self._delete_profile_btn.clicked.connect(self._delete_profile)
+        self._refresh_profiles_btn.clicked.connect(self._fetch_profiles)
+        self._export_profile_btn.clicked.connect(self._export_profile)
+        self._import_profile_btn.clicked.connect(self._import_profile)
+
+        layout.addWidget(profiles_group)
 
         # ── OBS WebSocket ─────────────────────────────────────────────────────
         obs_group = QGroupBox("OBS WebSocket")
@@ -828,6 +874,155 @@ class SettingsTab(QWidget):
         else:
             self.obs_status.setText("Connection failed.")
             self.obs_status.setStyleSheet("color: red")
+
+    # ── Profiles helpers ─────────────────────────────────────────────────────
+
+    def _set_prof_status(self, text: str, color: str = "gray"):
+        self._profiles_status.setText(text)
+        self._profiles_status.setStyleSheet(f"color: {color}")
+
+    def _fetch_profiles(self):
+        if not auth.is_signed_in():
+            self._set_prof_status("Sign in to view cloud profiles.", "gray")
+            return
+        self._refresh_profiles_btn.setEnabled(False)
+        self._set_prof_status("Loading…", "gray")
+
+        def _do():
+            try:
+                profiles = cloud_sync.fetch_profiles()
+                self._profiles_list.clear()
+                for p in profiles:
+                    item = QListWidgetItem(p["name"])
+                    item.setData(Qt.ItemDataRole.UserRole, p["name"])
+                    self._profiles_list.addItem(item)
+                self._set_prof_status(f"{len(profiles)} profile(s) found.", "green")
+            except Exception as e:
+                self._set_prof_status(f"Failed: {e}", "red")
+            finally:
+                self._refresh_profiles_btn.setEnabled(True)
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _save_profile(self):
+        if not auth.is_signed_in():
+            self._set_prof_status("Sign in to save profiles.", "gray")
+            return
+        name, ok = QInputDialog.getText(self, "Save Profile", "Profile name:")
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        self._save_profile_btn.setEnabled(False)
+        self._set_prof_status("Saving…", "gray")
+
+        def _do():
+            try:
+                cloud_sync.save_profile_to_cloud(self._config, name)
+                self._set_prof_status(f"Saved '{name}'.", "green")
+                self._fetch_profiles()
+            except Exception as e:
+                self._set_prof_status(f"Save failed: {e}", "red")
+            finally:
+                self._save_profile_btn.setEnabled(True)
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _load_profile(self):
+        item = self._profiles_list.currentItem()
+        if not item:
+            self._set_prof_status("Select a profile first.", "gray")
+            return
+        name = item.data(Qt.ItemDataRole.UserRole)
+        reply = QMessageBox.warning(
+            self, "Load Profile",
+            f"Load profile '{name}'?\n\nThis will replace ALL current layers. "
+            "Make sure you have saved or exported anything you want to keep.",
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Ok:
+            return
+        self._load_profile_btn.setEnabled(False)
+        self._set_prof_status("Loading…", "gray")
+
+        def _do():
+            try:
+                cloud_sync.load_profile_from_cloud(self._config, name)
+                self._set_prof_status(f"Loaded '{name}'.", "green")
+                self.profile_loaded.emit()
+            except Exception as e:
+                self._set_prof_status(f"Load failed: {e}", "red")
+            finally:
+                self._load_profile_btn.setEnabled(True)
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _delete_profile(self):
+        item = self._profiles_list.currentItem()
+        if not item:
+            self._set_prof_status("Select a profile first.", "gray")
+            return
+        name = item.data(Qt.ItemDataRole.UserRole)
+        reply = QMessageBox.question(
+            self, "Delete Profile",
+            f"Delete profile '{name}' from the cloud?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._delete_profile_btn.setEnabled(False)
+        self._set_prof_status("Deleting…", "gray")
+
+        def _do():
+            try:
+                cloud_sync.delete_profile_from_cloud(name)
+                self._set_prof_status(f"Deleted '{name}'.", "green")
+                self._fetch_profiles()
+            except Exception as e:
+                self._set_prof_status(f"Delete failed: {e}", "red")
+            finally:
+                self._delete_profile_btn.setEnabled(True)
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _export_profile(self):
+        import json as _json
+        path, _ = QFileDialog.getSaveFileName(self, "Export Profile", "profile.json",
+                                              "JSON files (*.json)")
+        if not path:
+            return
+        try:
+            with open(path, "w") as f:
+                _json.dump({"layers": self._config["layers"]}, f, indent=2)
+            self._set_prof_status("Profile exported.", "green")
+        except Exception as e:
+            self._set_prof_status(f"Export failed: {e}", "red")
+
+    def _import_profile(self):
+        import json as _json
+        path, _ = QFileDialog.getOpenFileName(self, "Import Profile", "",
+                                              "JSON files (*.json)")
+        if not path:
+            return
+        try:
+            with open(path) as f:
+                data = _json.load(f)
+            layers = data.get("layers")
+            if not isinstance(layers, dict):
+                raise ValueError("Invalid profile file — expected a 'layers' object.")
+            reply = QMessageBox.warning(
+                self, "Import Profile",
+                "Import this profile?\n\nThis will replace ALL current layers. "
+                "Make sure you have saved or exported anything you want to keep.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+            )
+            if reply != QMessageBox.StandardButton.Ok:
+                return
+            cfg.load_profile_into_working(self._config, layers)
+            cfg.save(self._config)
+            self._set_prof_status("Profile imported.", "green")
+            self.profile_loaded.emit()
+        except Exception as e:
+            self._set_prof_status(f"Import failed: {e}", "red")
 
 
 # ---------------------------------------------------------------------------
@@ -1189,6 +1384,16 @@ class MainWindow(QMainWindow):
         self.delete_layer_btn.setFixedWidth(60)
         self.delete_layer_btn.clicked.connect(self._delete_layer)
         layer_bar.addWidget(self.delete_layer_btn)
+        export_layer_btn = QPushButton("Export…")
+        export_layer_btn.setFixedWidth(70)
+        export_layer_btn.setToolTip("Export this layer to a JSON file")
+        export_layer_btn.clicked.connect(self._export_layer)
+        layer_bar.addWidget(export_layer_btn)
+        import_layer_btn = QPushButton("Import…")
+        import_layer_btn.setFixedWidth(70)
+        import_layer_btn.setToolTip("Import a layer from a JSON file")
+        import_layer_btn.clicked.connect(self._import_layer)
+        layer_bar.addWidget(import_layer_btn)
         layer_bar.addStretch()
         btab_layout.addLayout(layer_bar)
 
@@ -1221,6 +1426,7 @@ class MainWindow(QMainWindow):
 
         # --- Settings tab ---
         self.settings_tab = SettingsTab(self._config)
+        self.settings_tab.profile_loaded.connect(self._on_profile_loaded)
         tabs.addTab(self.settings_tab, "Settings")
 
         self.resize(1280, 700)
@@ -1315,6 +1521,40 @@ class MainWindow(QMainWindow):
             self._populate_layer_tabs()
             self.layer_tabs.setCurrentIndex(0)
 
+    def _export_layer(self):
+        import json as _json
+        layer_data = self._config["layers"].get(self._layer_id, {})
+        layer_name = layer_data.get("name", self._layer_id)
+        path, _ = QFileDialog.getSaveFileName(self, "Export Layer", f"{layer_name}.json",
+                                              "JSON files (*.json)")
+        if not path:
+            return
+        with open(path, "w") as f:
+            _json.dump({"layer": layer_data}, f, indent=2)
+
+    def _import_layer(self):
+        import json as _json
+        path, _ = QFileDialog.getOpenFileName(self, "Import Layer", "",
+                                              "JSON files (*.json)")
+        if not path:
+            return
+        try:
+            with open(path) as f:
+                data = _json.load(f)
+            layer_data = data.get("layer") or data  # support bare layer dict too
+            name = layer_data.get("name", "Imported")
+            new_id = cfg.add_layer(self._config, name)
+            self._config["layers"][new_id] = layer_data
+            self._config["layers"][new_id]["name"] = name  # ensure name is set
+            cfg.save(self._config)
+            self._populate_layer_tabs()
+            for i in range(self.layer_tabs.count()):
+                if self.layer_tabs.tabData(i) == new_id:
+                    self.layer_tabs.setCurrentIndex(i)
+                    break
+        except Exception as e:
+            QMessageBox.warning(self, "Import Failed", str(e))
+
     _DIAL_MODE_LABELS = {
         "sys_vol":    "System Volume",
         "app_vol":    "App Volume",
@@ -1341,6 +1581,12 @@ class MainWindow(QMainWindow):
 
     def _select_dial(self):
         self.action_panel.load_dial(self._config, self._layer_id)
+
+    def _on_profile_loaded(self):
+        """Called when SettingsTab loads a profile — rebuilds the layer tabs."""
+        self._layer_id = cfg.DEFAULT_LAYER_ID
+        self._populate_layer_tabs()
+        self.layer_tabs.setCurrentIndex(0)
 
     def _on_button_pressed(self, key_name: str):
         self.se_widget.highlight(key_name)
