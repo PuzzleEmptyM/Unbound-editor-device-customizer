@@ -133,7 +133,6 @@ class ActionPanel(QWidget):
         self._config = None
         self._button_name = None
         self._layer_id = cfg.DEFAULT_LAYER_ID
-        self._dial_mode_name = "jog"
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -389,39 +388,44 @@ class ActionPanel(QWidget):
         self._refresh_windows()
         self._refresh_scenes()
 
-        # ── Page 1: Dial config ────────────────────────────────────────────
+        # ── Page 1: Dial default config ────────────────────────────────────
         dial_page = QWidget()
         dlayout = QVBoxLayout(dial_page)
         dlayout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        dial_title = QLabel("Dial")
+        dial_title = QLabel("Dial — Default Behavior")
         dial_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         dlayout.addWidget(dial_title)
-
-        dmode_row = QHBoxLayout()
-        dmode_row.addWidget(QLabel("Mode:"))
-        self.dial_mode_combo = QComboBox()
-        self.dial_mode_combo.addItems(["Jog", "Shuttle", "Scroll"])
-        self.dial_mode_combo.currentIndexChanged.connect(self._on_dial_mode_combo_changed)
-        dmode_row.addWidget(self.dial_mode_combo)
-        dmode_row.addStretch()
-        dlayout.addLayout(dmode_row)
-
+        dlayout.addWidget(_wlabel("This action runs whenever the dial is turned and no override button is active."))
         dlayout.addSpacing(6)
-        left_lbl = QLabel("↺  Left / Counter-clockwise")
-        left_lbl.setFont(QFont("Arial", 9, QFont.Weight.Bold))
-        dlayout.addWidget(left_lbl)
-        self.dial_left_input = QLineEdit()
-        self.dial_left_input.setPlaceholderText("e.g. left")
-        dlayout.addWidget(self.dial_left_input)
 
-        dlayout.addSpacing(4)
-        right_lbl = QLabel("↻  Right / Clockwise")
-        right_lbl.setFont(QFont("Arial", 9, QFont.Weight.Bold))
-        dlayout.addWidget(right_lbl)
-        self.dial_right_input = QLineEdit()
-        self.dial_right_input.setPlaceholderText("e.g. right")
-        dlayout.addWidget(self.dial_right_input)
+        dlayout.addWidget(QLabel("Default Action:"))
+        self.dial_default_action = QComboBox()
+        self.dial_default_action.addItems(["System Volume", "App Volume", "Brightness"])
+        self.dial_default_action.currentIndexChanged.connect(self._on_dial_default_action_changed)
+        dlayout.addWidget(self.dial_default_action)
+
+        self._dial_default_app_widget = QWidget()
+        daw_l = QVBoxLayout(self._dial_default_app_widget)
+        daw_l.setContentsMargins(0, 4, 0, 0)
+        daw_l.addWidget(QLabel("App name (partial match, e.g. Spotify):"))
+        self.dial_default_app_input = QLineEdit()
+        self.dial_default_app_input.setPlaceholderText("Spotify")
+        daw_l.addWidget(self.dial_default_app_input)
+        self._dial_default_app_widget.setVisible(False)
+        dlayout.addWidget(self._dial_default_app_widget)
+
+        dlayout.addSpacing(8)
+        dlayout.addWidget(QLabel("Hardware Mode:"))
+        self.dial_default_hw_mode = QComboBox()
+        self.dial_default_hw_mode.addItems(["Jog", "Shuttle", "Scroll"])
+        dlayout.addWidget(self.dial_default_hw_mode)
+        self._dial_default_mode_desc = QLabel(_DIAL_HW_MODE_DESCS["Jog"])
+        self._dial_default_mode_desc.setWordWrap(True)
+        self._dial_default_mode_desc.setStyleSheet("color: #aaaaaa; font-size: 11px;")
+        self.dial_default_hw_mode.currentTextChanged.connect(
+            lambda t: self._dial_default_mode_desc.setText(_DIAL_HW_MODE_DESCS.get(t, "")))
+        dlayout.addWidget(self._dial_default_mode_desc)
 
         dlayout.addSpacing(8)
         dial_sens_hdr = QHBoxLayout()
@@ -525,35 +529,37 @@ class ActionPanel(QWidget):
         self._layer_id = layer_id
         self._config = config
         if self._mode_stack.currentIndex() == 1:
-            self._load_dial_for_mode(self._dial_mode_name)
+            self._load_dial_default()
 
     def load_dial(self, config: dict, layer_id: str):
-        """Switch to dial config mode and load values for the current dial mode."""
+        """Switch to dial config mode and load default dial values."""
         self._config = config
         self._layer_id = layer_id
         self._mode_stack.setCurrentIndex(1)
-        self.dial_mode_combo.blockSignals(True)
-        self.dial_mode_combo.setCurrentIndex(["jog", "shuttle", "scroll"].index(self._dial_mode_name))
-        self.dial_mode_combo.blockSignals(False)
-        self._load_dial_for_mode(self._dial_mode_name)
+        self._load_dial_default()
 
-    def _load_dial_for_mode(self, mode: str):
-        left  = cfg.get_dial_action(self._config, mode, "left",  self._layer_id)
-        right = cfg.get_dial_action(self._config, mode, "right", self._layer_id)
-        self.dial_left_input.setText(
-            left.get("keys", "") if left.get("action") == cfg.ACTION_HOTKEY else "")
-        self.dial_right_input.setText(
-            right.get("keys", "") if right.get("action") == cfg.ACTION_HOTKEY else "")
-        sensitivity = cfg.get_dial_sensitivity(self._config, mode, self._layer_id)
+    def _load_dial_default(self):
+        default = cfg.get_dial_default(self._config, self._layer_id)
+        action_idx = {"sys_vol": 0, "app_vol": 1, "brightness": 2}.get(
+            default.get("action", "sys_vol"), 0)
+        self.dial_default_action.blockSignals(True)
+        self.dial_default_action.setCurrentIndex(action_idx)
+        self.dial_default_action.blockSignals(False)
+        self.dial_default_app_input.setText(default.get("app", ""))
+        self._update_dial_default_app_visibility()
+        self.dial_default_hw_mode.setCurrentText(default.get("hw_mode", "Jog"))
+        sensitivity = default.get("sensitivity", 100)
         self.dial_sensitivity_slider.blockSignals(True)
         self.dial_sensitivity_slider.setValue(sensitivity)
         self.dial_sensitivity_slider.blockSignals(False)
         self.dial_sens_val_lbl.setText(str(sensitivity))
 
-    def _on_dial_mode_combo_changed(self, idx: int):
-        self._dial_mode_name = ["jog", "shuttle", "scroll"][idx]
-        if self._config:
-            self._load_dial_for_mode(self._dial_mode_name)
+    def _on_dial_default_action_changed(self, idx: int):
+        self._update_dial_default_app_visibility()
+
+    def _update_dial_default_app_visibility(self):
+        self._dial_default_app_widget.setVisible(
+            self.dial_default_action.currentIndex() == 1)
 
     def load_button(self, button_name: str, config: dict, layer_id: str = cfg.DEFAULT_LAYER_ID):
         self._mode_stack.setCurrentIndex(0)
@@ -623,23 +629,19 @@ class ActionPanel(QWidget):
                 self.brightness_hw_mode.setCurrentText(hw_mode)
 
     def _save(self):
-        # Dial circle config save
+        # Dial default config save
         if self._mode_stack.currentIndex() == 1:
             if not self._config:
                 return
-            mode = self._dial_mode_name
-            left_keys  = self.dial_left_input.text().strip()
-            right_keys = self.dial_right_input.text().strip()
-            cfg.set_dial_action(self._config, mode, "left",
-                                {"action": cfg.ACTION_HOTKEY, "keys": left_keys}
-                                if left_keys else {"action": cfg.ACTION_NONE},
-                                self._layer_id)
-            cfg.set_dial_action(self._config, mode, "right",
-                                {"action": cfg.ACTION_HOTKEY, "keys": right_keys}
-                                if right_keys else {"action": cfg.ACTION_NONE},
-                                self._layer_id)
-            cfg.set_dial_sensitivity(self._config, mode,
-                                     self.dial_sensitivity_slider.value(), self._layer_id)
+            action_key = ["sys_vol", "app_vol", "brightness"][
+                self.dial_default_action.currentIndex()]
+            default = {
+                "action":      action_key,
+                "app":         self.dial_default_app_input.text().strip(),
+                "hw_mode":     self.dial_default_hw_mode.currentText(),
+                "sensitivity": self.dial_sensitivity_slider.value(),
+            }
+            cfg.set_dial_default(self._config, default, self._layer_id)
             cfg.save(self._config)
             self.saved.emit()
             return

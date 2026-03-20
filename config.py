@@ -80,6 +80,19 @@ def get_button(config: dict, button_name: str, layer_id: str = DEFAULT_LAYER_ID)
             .get(button_name, {"action": ACTION_NONE}))
 
 
+def get_dial_default(config: dict, layer_id: str = DEFAULT_LAYER_ID) -> dict:
+    """Return the default dial action for this layer."""
+    return (config["layers"]
+            .get(layer_id, {})
+            .get("dial_default", {"action": "sys_vol", "hw_mode": "Jog", "sensitivity": 100, "app": ""}))
+
+
+def set_dial_default(config: dict, action: dict, layer_id: str = DEFAULT_LAYER_ID):
+    if layer_id not in config["layers"]:
+        config["layers"][layer_id] = {"name": layer_id, "buttons": {}}
+    config["layers"][layer_id]["dial_default"] = action
+
+
 def get_dial_sensitivity(config: dict, mode: str, layer_id: str = DEFAULT_LAYER_ID) -> int:
     """Return sensitivity 0-100 for this dial mode (default 100 = max sensitive).
     Migrates old threshold format (1-20) automatically."""

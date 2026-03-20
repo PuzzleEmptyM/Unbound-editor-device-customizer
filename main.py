@@ -107,19 +107,14 @@ def main():
 
     def _fire_dial(mode_name, direction):
         sign = 1 if direction == "right" else -1
-        if _dial_override:
-            ov = _dial_override.get("mode")
-            if ov == "sys_vol":
-                system_action.adjust_master_volume(sign * system_action.VOL_STEP)
-            elif ov == "app_vol":
-                system_action.adjust_app_volume(_dial_override.get("app", ""),
-                                                sign * system_action.VOL_STEP)
-            elif ov == "brightness":
-                system_action.adjust_brightness(sign * system_action.BRIGHT_STEP)
-        else:
-            action = cfg.get_dial_action(config, mode_name, direction, _current_layer())
-            if action.get("action") == cfg.ACTION_HOTKEY:
-                hotkey_action.send(action.get("keys", ""))
+        source = _dial_override if _dial_override else cfg.get_dial_default(config, _current_layer())
+        dial_action = source.get("action") or source.get("mode")
+        if dial_action == "sys_vol":
+            system_action.adjust_master_volume(sign * system_action.VOL_STEP)
+        elif dial_action == "app_vol":
+            system_action.adjust_app_volume(source.get("app", ""), sign * system_action.VOL_STEP)
+        elif dial_action == "brightness":
+            system_action.adjust_brightness(sign * system_action.BRIGHT_STEP)
 
     def on_jog(mode, value):
         if value == 0:
@@ -133,15 +128,12 @@ def main():
                 return
             _last_shuttle_fire[0] = now
 
-        # Get sensitivity (0-100): from override action if active, else from config
-        if _dial_override:
-            # Only fire if hardware mode matches what the user configured
-            hw_mode = _dial_override.get("hw_mode", "Jog").lower()
-            if hw_mode != mode_name:
-                return
-            sensitivity = _dial_override.get("sensitivity", 100)
-        else:
-            sensitivity = cfg.get_dial_sensitivity(config, mode_name, _current_layer())
+        # Get sensitivity and hw_mode from override action or dial default
+        source = _dial_override if _dial_override else cfg.get_dial_default(config, _current_layer())
+        hw_mode = source.get("hw_mode", "Jog").lower()
+        if hw_mode != mode_name:
+            return
+        sensitivity = source.get("sensitivity", 100)
 
         if sensitivity == 0:
             return  # dial disabled for this mapping
