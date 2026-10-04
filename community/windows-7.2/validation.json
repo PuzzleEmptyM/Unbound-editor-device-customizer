@@ -1,0 +1,51 @@
+{
+  "version": "7.2",
+  "build": {
+    "baseline": {
+      "folder": "68f16789cc4571f3d4b3486e437933935c3cf73c757b08d74e0179d6cca800b1",
+      "portable": "094580c433afc006d053d8f9a8ee233e819a532e650b5251f49185a92bd4d389"
+    },
+    "source_sha256": {
+      "glass_theme.py": "61e64c68555dc797351b37fe9d9757fea8c9616eaeffb528983f94147d4276c3",
+      "glass_overlay.py": "4819e52e3f276182427bc4289d1fde5ed3f9c8dd12326e74e08ae47b245a745d",
+      "glass_help.py": "cb3168461c09889248b2abc681ec0461883b5151ad6e3d56ac1898e6490b1a3f",
+      "uniform_controls.py": "19da3630a629462326969ed0c8a1edd3dc369004c759a47baeeeff6ff2026eb3",
+      "precision_input.py": "e0c285d8e97d69cdb9eac2eb9968303f9fa484c3805c634ba45a45451fe6ab45",
+      "shared_controls.py": "378dcdec2869d1762f6704827305acb6ffabf45d040c179536d4d3096d877598",
+      "consistent_ui.py": "bf45d537cf95c7ff3a663c34d93fb8ebf869045964148bdc2923f0191f1ed217",
+      "switch_reliability.py": "50b8c6093cff1c4229b0e8e6df6c341c989d08dd0bcd2e2c466c43b4fc3dffc1",
+      "extra_editor.py": "9d6d9f8201da45f919074e881bc66be8be3fb70b81b452969865b28d923fcb0e",
+      "glass_ui.py": "c715e319372b45cfc184baecc1c3df5eecc582309bc2cd1662ff2ed2f6c41bb7"
+    },
+    "folder_sha256": "53579303d046fd985525d9ba81027c09885176b9eb331887287577fc9ec502af",
+    "folder_bytes": 6116454,
+    "portable_sha256": "104412c6ca47568c95b6e9d0f3e4e72598dd26c6d4a893899b1632fecc92b3d7",
+    "portable_bytes": 46596910
+  },
+  "packaged_checks": {
+    "runtime": 107,
+    "interface": 44,
+    "extra_editor": 46
+  },
+  "native": {
+    "exit_code": 0,
+    "passed": true,
+    "checks": 107,
+    "fresh": true,
+    "native_glass": null,
+    "source_sha256": "104412c6ca47568c95b6e9d0f3e4e72598dd26c6d4a893899b1632fecc92b3d7",
+    "access_violation": false,
+    "error": null
+  },
+  "v6_payloads_unchanged": true,
+  "physical_device_tested": false,
+  "manual_checks": [
+    "click-through enabled from floating panel and disabled from main window",
+    "underlying input focus through floating panel",
+    "OBS extra editor opened and saved source name while changing row"
+  ],
+  "limitations": [
+    "HID and OS output substituted in automated tests",
+    "External app commands not individually exercised against every installed app"
+  ]
+}

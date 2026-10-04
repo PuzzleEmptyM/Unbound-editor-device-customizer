@@ -1,0 +1,55 @@
+"""Searchable, offline Traditional Chinese guide shared with the standalone page."""
+import html
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLineEdit,QListWidget,QListWidgetItem,QTextBrowser,QPushButton,QLabel
+from speed_editor_glass_theme import colors
+import speed_editor_expanded_overlay as overlay
+import speed_editor_context as context
+
+SECTIONS=[
+('開始使用', '連接 控制器 USB 藍牙 掃描 自動切換', '<p class="eyebrow">START HERE</p><h1>讓每個按鍵，都跟上你正在做的事。</h1><p>保持本程式開啟，連接 Speed Editor，開啟「自動切換」。切到目標程式後，按鍵與旋鈕會套用對應配置，浮動面板也會一起更新。</p><h2>第一次使用</h2><ol><li>連接控制器，確認下方裝置狀態。</li><li>在「應用程式」確認掃描完成。認得的軟體使用專屬範本，其餘使用可自訂的通用配置。</li><li>開啟 YouTube、PotPlayer 或文書程式，查看浮動面板目前的功能。</li><li>按硬體按鍵或轉旋鈕。回到編輯器時，保留你正在編輯的配置。</li></ol><p class="note">本機功能不需要登入。登入只用於雲端設定檔。未偵測到裝置時，先確認 USB／藍牙連線與其他程式是否占用控制器。</p>'),
+('控制滑鼠', '左右 上下 旋鈕 按住 點擊 左鍵 右鍵 雙擊 拖曳 框選 選取 通用 固定 速度 精細 加速', '<p class="eyebrow">MOUSE CONTROL</p><h1>每個程式，都用同一組滑鼠鍵。</h1><p>六個滑鼠鍵集中在同一區，切換程式或配置後位置也相同。直接按實體按鍵即可使用，無須逐一設定範本。</p><table><tr><th>要做什麼</th><th>固定操作</th></tr><tr><td>左右移動</td><td>按住 <b>SLIP SRC</b>＋轉旋鈕。</td></tr><tr><td>上下移動</td><td>按住 <b>SLIP DEST</b>＋轉旋鈕。</td></tr><tr><td>左鍵選取</td><td>按 <b>CUT</b>。</td></tr><tr><td>右鍵選單</td><td>按 <b>DIS</b>。</td></tr><tr><td>雙擊</td><td>按 <b>SMTH CUT</b>。</td></tr><tr><td>拖曳、選文字或框選</td><td>按住 <b>TRANS DUR</b>＋<b>SLIP SRC</b> 或 <b>SLIP DEST</b>，再轉旋鈕。</td></tr></table><p>放開方向鍵，旋鈕恢復目前程式的用途。拖曳時可放開方向鍵再換另一方向；放開 TRANS DUR 才結束拖曳。</p><h2>移得更細，捲得更慢</h2><p>預設每次移動 2 像素。啟用輕柔加速時，連續快速轉動才逐漸增加至 4 像素；停頓、反轉或換方向後恢復細步移動，放開後不會繼續滑動。捲動量預設為 8。</p><p>到「通用操作」調整滑鼠移動距離、捲動量及加速。設定會套用所有程式；想要最精細的操作，可將移動距離設為 1 並關閉加速。</p><h2>固定通用操作</h2><p>預設按住 <b>LIVE OWR</b> 進入通用操作：直接轉旋鈕可移動左右，加按 SLIP DEST 可移動上下。按 JOG 後轉旋鈕可捲動頁面；SHTL、SCRL 分別切回左右、上下。放開 LIVE OWR 就回到目前程式。</p><table><tr><th>同組按鍵</th><th>通用功能</th></tr><tr><td>CAM 1／2／3</td><td>複製／貼上／剪下</td></tr><tr><td>CAM 4／5／6</td><td>復原／重做／全選</td></tr><tr><td>CAM 7／8／9</td><td>尋找／儲存／切換視窗</td></tr><tr><td>IN／OUT</td><td>網頁上一頁／下一頁</td></tr><tr><td>TRIM IN／TRIM OUT</td><td>上一個分頁／下一個分頁</td></tr></table><p class="note">通用功能要按住通用鍵；上方六個固定滑鼠鍵隨時可直接使用。浮動面板會顯示目前生效的功能，點擊圖中的按鍵只會查看提示。</p>'),
+('浮動面板', '大小 縮放 精簡 毛玻璃 穿透 提示 文字 按鈕', '<p class="eyebrow">FLOATING GUIDE</p><h1>配置留在眼前，工作留在原處。</h1><p><b>Ctrl＋Alt＋F12</b> 或主畫面的「浮動按鍵面板」可顯示／隱藏。拖曳標題移動，拖曳右下角改變大小。</p><h2>大小與文字</h2><p>完整模式在寬版、窄版與直向視窗都保留實體鍵盤排列，按鍵位置不會因視窗形狀改變。勾選「精簡」只顯示 12 個常用控制。</p><p>空間不足時，會先移除 SMART INSRT 等原按鍵文字，將空間讓給目前功能。滑鼠停留仍可看到完整功能與硬體名稱。</p><h2>半透明與穿透</h2><p>底部不透明度控制面板整體透明程度。勾選浮動面板的「穿透」，點擊就會傳到背後視窗。要重新移動、縮放或操作面板，到主視窗底部取消「面板穿透」即可；「應用程式 → 滑鼠穿透」也能調整同一設定。</p><p>面板移出螢幕時按「移回目前螢幕」。按住通用鍵或切換其他功能頁時，面板會跟著顯示對應配置。</p><p class="note">面板是硬體功能提示；點擊圖中的按鍵不會執行硬體動作。</p>'),
+('顏色與毛玻璃', '主題 配色 自訂 顏色 外觀 亮色 深色 壓克力', '<p class="eyebrow">MAKE IT YOURS</p><h1>選一個看得舒服的顏色。</h1><p>在「外觀」選霧藍、薄荷、薰衣草、玫瑰、琥珀或冰川，也可以按「自訂顏色…」選色。主視窗、按鍵、選單與浮動面板會一起更新。</p><ul><li><b>亮色介面：</b>切換深色／亮色，文字會跟著調整。</li><li><b>霧面濃度：</b>調整表面的遮蔽程度。放開滑桿即儲存。</li><li><b>Windows 毛玻璃：</b>支援的 Windows 11 使用系統 Acrylic 背景。舊版 Windows 或系統效果不可用時，使用漸層霧面底色。</li></ul><p>顏色會儲存，重新開啟或搬移設定後仍會保留。浮動面板的不透明度可另外調整。</p>'),
+('範本與儲存', '按鍵 編輯 快捷鍵 儲存 Ctrl S 應用程式 通用 隱藏', '<p class="eyebrow">YOUR MAPPINGS</p><h1>先選程式，再設定按鍵。</h1><ol><li>「應用程式」搜尋目標軟體。</li><li>按「在範本中編輯按鍵…」。</li><li>選硬體鍵，從「帶入預設」選功能並帶入，或自行設定動作。</li><li>按「儲存」或 Ctrl＋S。變更會立刻寫入目前設定。</li></ol><p>可設定快捷鍵、按住修飾鍵、程式切換、OBS、配置層、旋鈕及滑鼠操作。原有複製、匯入／匯出與手動配置層仍可使用。</p><p>「選擇顯示的程式」只整理清單，不會刪掉設定或停用辨識。掃描找不到的可攜程式，可按「加入可攜程式…」。</p><p class="note">快捷鍵依各軟體的版本、目前面板及自訂鍵位而異；若你改過軟體快捷鍵，請在此改成一致。</p>'),
+('YouTube 與播放器', 'youtube yt shorts potplayer 音量 播放 速度 進度', '<p class="eyebrow">WATCH & EDIT</p><h1>播放、進度、音量與速度。</h1><table><tr><th>控制</th><th>YouTube／PotPlayer 預設</th></tr><tr><td>STOP PLAY</td><td>播放／暫停</td></tr><tr><td>JOG＋旋鈕</td><td>影片進度</td></tr><tr><td>SHTL＋旋鈕</td><td>音量</td></tr><tr><td>SCRL＋旋鈕</td><td>播放速度</td></tr><tr><td>IN／OUT</td><td>上一部／下一部；YouTube 上一部需要播放清單</td></tr></table><p>Shorts 的 IN／OUT 切換上一則／下一則；旋鈕進度約每步 5 秒。Shorts 使用系統音量，避免上下鍵誤換片，目前不提供一般影片的速度與百分比跳轉快捷鍵。</p><p>PotPlayer 有 41 項預設，包含逐格、字幕、A–B 循環、播放清單與開檔。YouTube 控制前先選取播放器，文字輸入中不會把控制指令打進欄位。</p>'),
+('OBS 操作', '直播 錄影 websocket 場景 來源 麥克風 桌面 音訊 媒體 其他功能 ESC', '<p class="eyebrow">OBS STUDIO</p><h1>讓場景與音訊伸手可及。</h1><ol><li>在 OBS 開啟 WebSocket 伺服器。</li><li>本程式「設定 → OBS WebSocket」填入相同主機、連接埠與密碼，再按「連線」。</li><li>切到 OBS，使用對應配置。CAM1～9 依 OBS 場景清單切換。</li></ol><p>SOURCE、SHTL、SCRL 分別切換旋鈕控制場景、麥克風音量、桌面音訊音量。43 項預設也包含錄影暫停、重播緩衝、工作室模式、轉場、虛擬攝影機與媒體操作。</p><p>來源與濾鏡需要先在「OBS 進階控制」指定名稱；可按「讀取 OBS 場景與來源」取得清單。回放緩衝要先在 OBS 啟用。</p><h2>媒體操作與其他功能</h2><p>滑鼠區維持所有程式相同的六個按鍵。原本佔用這些位置的 OBS 功能保留在「程式其他功能」頁：<b>按住通用鍵（預設 LIVE OWR），再按 ESC</b>。保持通用鍵按住，使用左上方相鄰的六個按鍵：</p><table><tr><th>位置</th><th>左</th><th>中</th><th>右</th></tr><tr><td>上排</td><td>SMART INSRT：上一個媒體</td><td>APPND：播放／暫停</td><td>RIPL OWR：下一個媒體</td></tr><tr><td>下排</td><td>CLOSE UP：重新播放</td><td>PLACE ON TOP：停止媒體</td><td>SRC OWR：切換濾鏡</td></tr></table><p>再次按 ESC 回到通用功能，放開通用鍵回到 OBS 專用配置。浮動面板會顯示目前這一頁的功能名稱；自訂配置有更多其他功能時，ESC 會依序切換各頁。</p>'),
+('登入與備份', 'google 登入 帳號 同步 雲端 備份 匯出 可攜 還原', '<p class="eyebrow">KEEP YOUR SETUP</p><h1>本機能用，雲端可存。</h1><p>登入前先到「設定 → 匯出 JSON…」保留按鍵配置。按程式內的「登入」，在瀏覽器完成帳號登入；出現「Signed in to Unbound」即可回到程式。</p><p>若登入後停在 Unbound API 首頁，可回到程式登入時開啟的裝置頁完成連接。Clerk 的開發者後台不需建立應用程式。</p><table><tr><th>功能</th><th>作用</th></tr><tr><td>儲存目前設定…</td><td>把配置層保存為有名稱的雲端設定檔。</td></tr><tr><td>載入所選設定檔</td><td>取代目前所有配置層。</td></tr><tr><td>立即同步</td><td>下載雲端配置；登入成功也會自動執行。</td></tr></table><p class="note">立即同步不是上傳備份。先匯出想保留的配置，再下載雲端內容。</p><h2>搬到另一台電腦</h2><p>關閉程式，把 EXE 與 config.json 一起放到可寫入資料夾；不需要安裝 Python 或攜帶 _internal。只帶 EXE 會建立新配置。帳號登入資訊由該電腦保存，換電腦需要重新登入。</p>'),
+('常見問題', '太快 失效 閃退 無反應 找不到 恢復 疑難排解', '<p class="eyebrow">QUICK FIXES</p><h1>先確認現在生效的配置。</h1><h2>滑鼠不動</h2><p>確認硬體裝置已連接。按住 SLIP SRC 再轉旋鈕移動左右；按住 SLIP DEST 再轉旋鈕移動上下。這組位置適用所有程式。</p><h2>捲動太快</h2><p>到「通用操作」降低捲動量，所有程式會一起變慢。滑鼠太快則降低移動距離，或關閉輕柔加速；預設為 2 像素、捲動量 8。</p><h2>面板擋住視窗</h2><p>勾選浮動面板的「穿透」，或按 Ctrl＋Alt＋F12 隱藏。要操作面板時，回主視窗底部取消「面板穿透」。快捷鍵被占用時，使用主畫面的「浮動按鍵面板」。</p><h2>按鍵無反應</h2><p>確認裝置已連接、目標程式在前景、按鍵有配置。原軟體的自訂快捷鍵與權限差異可能影響控制。雲端登入不會解決硬體連線問題。</p><h2>儲存失敗或程式意外關閉</h2><p>將程式放在可寫入資料夾，保留 config.json 與備份。問題發生時可查看同資料夾的 SpeedEditorCustomizer-errors.log；分享前移除私人資訊。</p>')]
+
+def page_style(c):
+    return f'''body{{font-family:"Microsoft JhengHei UI",sans-serif;color:{c['text']};line-height:1.85;margin:22px;}}h1{{font-size:28px;line-height:1.45;}}h2{{font-size:19px;margin-top:28px;color:{c['accent']};}}.eyebrow{{font-size:11px;letter-spacing:2px;color:{c['muted']};}}p,li{{font-size:14px;}}table{{border-collapse:collapse;width:100%;margin:18px 0;}}td,th{{border:1px solid {c['line']};padding:10px;text-align:left;}}.note{{background:{c['raised']};padding:16px;border-left:3px solid {c['accent']};}}'''
+
+class Guide(QWidget):
+    def __init__(self,owner):
+        super().__init__();self.owner=owner
+        layout=QVBoxLayout(self);layout.setContentsMargins(22,18,22,18)
+        header=QHBoxLayout();self.search=QLineEdit();self.search.setPlaceholderText('搜尋說明：滑鼠、毛玻璃、YouTube、登入…');self.search.setClearButtonEnabled(True)
+        header.addWidget(self.search,1);button=QPushButton('編輯目前生效的配置');button.clicked.connect(owner._expanded_overlay.open_editor);header.addWidget(button);layout.addLayout(header)
+        content=QHBoxLayout();self.topics=QListWidget();self.topics.setFixedWidth(185);self.body=QTextBrowser();self.body.setOpenExternalLinks(False)
+        content.addWidget(self.topics);content.addWidget(self.body,1);layout.addLayout(content,1)
+        self.hint=QLabel('F1 開啟使用說明 · 所有說明均可離線閱讀');layout.addWidget(self.hint)
+        self.search.textChanged.connect(self.filter);self.topics.currentItemChanged.connect(lambda *args:self.render());self.filter('')
+        owner._context.changed.connect(self.render)
+    def filter(self,text):
+        current=self.topics.currentItem();selected=current.data(Qt.ItemDataRole.UserRole) if current else 0
+        self.topics.blockSignals(True);self.topics.clear()
+        for i,(title,keywords,body) in enumerate(SECTIONS):
+            if text.casefold() not in (title+' '+keywords+' '+body).casefold():continue
+            item=QListWidgetItem(title);item.setData(Qt.ItemDataRole.UserRole,i);self.topics.addItem(item)
+            if i==selected:self.topics.setCurrentItem(item)
+        if self.topics.currentRow()<0 and self.topics.count():self.topics.setCurrentRow(0)
+        self.topics.blockSignals(False);self.render()
+    def render(self,*args):
+        item=self.topics.currentItem();c=colors(self.owner._config)
+        body=SECTIONS[item.data(Qt.ItemDataRole.UserRole)][2] if item else '<h1>找不到符合的說明</h1><p>試試「滑鼠」、「儲存」或「顏色」。</p>'
+        if item and item.data(Qt.ItemDataRole.UserRole)==1:
+            from speed_editor_shared_controls import settings as shared_settings
+            from speed_editor_precision_input import settings as precision_settings
+            common=shared_settings(self.owner._config)
+            key=html.escape(common['modifier'].replace('_',' '))
+            precise=precision_settings(self.owner._config)
+            body+='<h2>目前全域設定</h2><p>滑鼠每步 '+str(precise['pointer_step'])+' 像素；捲動量 '+str(precise['scroll_step'])+'；輕柔加速'+('已開啟' if precise['acceleration'] else '已關閉')+'。這些設定適用所有程式。</p>'
+            body+='<p>目前通用鍵：<b>'+key+'</b>。'+('按住時使用通用功能，放開回到目前程式。' if common['enabled'] else '通用操作目前已關閉，可到「通用操作」開啟。')+'六個固定滑鼠鍵仍可直接使用。</p>'
+        scroll=self.body.verticalScrollBar().value();self.body.setHtml('<style>'+page_style(c)+'</style>'+body.replace('转旋','轉旋').replace('切換','切換'));self.body.verticalScrollBar().setValue(scroll)
+
